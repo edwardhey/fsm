@@ -7,26 +7,31 @@ type State interface{}
 
 type Machine struct {
 	State State
-	FSM   *FSM
+	fsm   *FSM
 }
 
 func (m *Machine) Goto(s State, args ...interface{}) error {
-	fn, err := m.FSM.GetHandleFunc(m.State, s)
-	if err != nil {
-		return err
+	fn, ok := m.fsm.GetHandleFunc(m.State, s)
+	isSpecial := m.fsm.IsSpecial(s)
+	if !ok && !isSpecial { //如果没有，并且不是特殊的函数
+		return fmt.Errorf("Transition %v to %v not permitted", m.State, s)
 	}
 	{
-		stateFuncs, ok := m.FSM.GetStateOnFuncs(m.State)
+		stateFuncs, ok := m.fsm.GetStateOnFuncs(m.State)
 		if ok && stateFuncs.onExit != nil {
 			stateFuncs.onExit(args)
 		}
 	}
-	err = fn(m.State, s, args)
-	if err != nil {
-		return err
+	{
+		if fn != nil {
+			err := fn(m.State, s, args)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	{
-		stateFuncs, ok := m.FSM.GetStateOnFuncs(s)
+		stateFuncs, ok := m.fsm.GetStateOnFuncs(s)
 		if ok && stateFuncs.onEnter != nil {
 			stateFuncs.onEnter(args)
 		}
@@ -54,27 +59,34 @@ type HandleFunc func(State, State, ...interface{}) error
 
 type FSM struct {
 	// State State
-	rules        map[State]map[State]HandleFunc
-	currentState State
-	toState      State
-	states       map[State]*FSMState
+	rules         map[State]map[State]HandleFunc
+	currentState  State
+	toState       State
+	states        map[State]*FSMState
+	specialStates map[State]bool
 }
 
-func (fsm *FSM) GetHandleFunc(from State, to State) (HandleFunc, error) {
+func (fsm *FSM) GetHandleFunc(from State, to State) (HandleFunc, bool) {
 	if from == to {
-		return nil, nil
+		return nil, true
 	}
-	fn, ok := fsm.rules[from][to]
+	maps, ok := fsm.rules[from]
 	if !ok {
-		return nil, fmt.Errorf("Transition %v to %v not permitted", from, to)
+		return nil, false
 	}
-	return fn, nil
+	fn, ok := maps[to]
+	return fn, ok
+	// if !ok {
+	// retu
+	// }
+	// return fn, nil
 }
 
 func NewFSM() *FSM {
 	f := &FSM{
-		rules:  make(map[State]map[State]HandleFunc, 10),
-		states: make(map[State]*FSMState, 10),
+		rules:         make(map[State]map[State]HandleFunc, 10),
+		states:        make(map[State]*FSMState, 10),
+		specialStates: make(map[State]bool, 10),
 	}
 	return f
 }
@@ -82,7 +94,7 @@ func NewFSM() *FSM {
 func (fsm *FSM) Machine(s State) *Machine {
 	return &Machine{
 		State: s,
-		FSM:   fsm,
+		fsm:   fsm,
 	}
 }
 
@@ -110,6 +122,15 @@ func (fsm *FSM) From(s State) *FSM {
 	fsm.currentState = s
 	fsm.toState = s
 	return fsm
+}
+
+func (fsm *FSM) Special(s State) {
+	fsm.specialStates[s] = true
+}
+
+func (fsm *FSM) IsSpecial(s State) bool {
+	_, ok := fsm.specialStates[s]
+	return ok
 }
 
 func (fsm *FSM) To(s State) *FSM {
