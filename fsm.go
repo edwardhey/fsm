@@ -19,12 +19,12 @@ func (m *Machine) Goto(s State, args ...interface{}) error {
 	{
 		stateFuncs, ok := m.fsm.GetStateOnFuncs(m.State)
 		if ok && stateFuncs.onExit != nil {
-			stateFuncs.onExit(args)
+			stateFuncs.onExit(args...)
 		}
 	}
 	{
 		if fn != nil {
-			err := fn(m.State, s, args)
+			err := fn(m.State, s, args...)
 			if err != nil {
 				return err
 			}
@@ -33,7 +33,7 @@ func (m *Machine) Goto(s State, args ...interface{}) error {
 	{
 		stateFuncs, ok := m.fsm.GetStateOnFuncs(s)
 		if ok && stateFuncs.onEnter != nil {
-			stateFuncs.onEnter(args)
+			stateFuncs.onEnter(args...)
 		}
 	}
 	m.State = s
@@ -135,6 +135,7 @@ func (fsm *FSM) IsSpecial(s State) bool {
 
 func (fsm *FSM) To(s State) *FSM {
 	fsm.toState = s
+	fsm.rules[fsm.currentState][s] = nil
 	return fsm
 	// fsm.rules[fsm.currentState][s]
 }
