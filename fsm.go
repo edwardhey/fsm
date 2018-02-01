@@ -1,4 +1,4 @@
-package main
+package fsm
 
 import "fmt"
 
@@ -123,37 +123,37 @@ func (fsm *FSM) Then(fn HandleFunc) {
 	// return fn(fsm.currentState, fsm.toState)
 }
 
-//-----------------------------------------------------------
-type S int
+// //-----------------------------------------------------------
+// type S int
 
-type AA struct {
-	State int
-}
+// type AA struct {
+// 	State int
+// }
 
-func (a *AA) Change(from State, to State, args ...interface{}) error {
-	fmt.Println(from, to, args)
-	return nil
-}
+// func (a *AA) Change(from State, to State, args ...interface{}) error {
+// 	fmt.Println(from, to, args)
+// 	return nil
+// }
 
-func main() {
+// func main() {
 
-	a := &AA{}
+// 	a := &AA{}
 
-	s1 := S(1)
-	s2 := S(2)
-	s3 := S(3)
-	fsm := NewFSM()
-	fsm.SetStateFuncs(s1, func(args ...interface{}) {
-		fmt.Println("on exit s1")
-	}, nil)
-	fsm.SetStateFuncs(s2, nil, func(args ...interface{}) {
-		fmt.Println("on enter s2")
-	})
-	// fsm.Start(s1)
-	fsm.From(s1).To(s2).Then(a.Change)
+// 	s1 := S(1)
+// 	s2 := S(2)
+// 	s3 := S(3)
+// 	fsm := NewFSM()
+// 	fsm.SetStateFuncs(s1, func(args ...interface{}) {
+// 		fmt.Println("on exit s1")
+// 	}, nil)
+// 	fsm.SetStateFuncs(s2, nil, func(args ...interface{}) {
+// 		fmt.Println("on enter s2")
+// 	})
+// 	// fsm.Start(s1)
+// 	fsm.From(s1).To(s2).Then(a.Change)
 
-	m := fsm.Machine(s1)
-	m.Goto(s2)
-	err := m.Goto(s3)
-	fmt.Println(err)
-}
+// 	m := fsm.Machine(s1)
+// 	m.Goto(s2)
+// 	err := m.Goto(s3)
+// 	fmt.Println(err)
+// }
