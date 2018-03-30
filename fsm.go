@@ -1,30 +1,40 @@
 package fsm
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 // type Event uint64
 type State interface{}
 
 type Machine struct {
-	State State
-	fsm   *FSM
+	state  State
+	fsm    *FSM
+	object IMachine
 }
 
-func (m *Machine) Goto(s State, args ...interface{}) error {
-	fn, ok := m.fsm.GetHandleFunc(m.State, s)
+type IMachine interface {
+	GetState() State
+	SetState(State)
+	OnInitWithMachine(*FSM)
+}
+
+func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error {
+	fn, ok := m.fsm.GetHandleFunc(m.state, s)
 	isSpecial := m.fsm.IsSpecial(s)
 	if !ok && !isSpecial { //如果没有，并且不是特殊的函数
-		return fmt.Errorf("Transition %v to %v not permitted", m.State, s)
+		return fmt.Errorf("Transition %v to %v not permitted", m.state, s)
 	}
 	{
-		stateFuncs, ok := m.fsm.GetStateOnFuncs(m.State)
+		stateFuncs, ok := m.fsm.GetStateOnFuncs(m.state)
 		if ok && stateFuncs.onExit != nil {
-			stateFuncs.onExit(args...)
+			stateFuncs.onExit(m.object, ctx, args...)
 		}
 	}
 	{
 		if fn != nil {
-			err := fn(m.State, s, args...)
+			err := fn(m.object, ctx, m.state, s, args...)
 			if err != nil {
 				return err
 			}
@@ -33,29 +43,33 @@ func (m *Machine) Goto(s State, args ...interface{}) error {
 	{
 		stateFuncs, ok := m.fsm.GetStateOnFuncs(s)
 		if ok && stateFuncs.onEnter != nil {
-			stateFuncs.onEnter(args...)
+			stateFuncs.onEnter(m.object, ctx, args...)
 		}
 	}
-	m.State = s
+	m.state = s
+	m.object.SetState(s)
 	return nil
 }
 
+type OnEnterFunc func(IMachine, context.Context, ...interface{})
+type OnExitFunc func(IMachine, context.Context, ...interface{})
+
 type FSMState struct {
-	onEnter func(...interface{})
-	onExit  func(...interface{})
+	onEnter OnEnterFunc
+	onExit  OnExitFunc
 }
 
-func (ft *FSMState) SetOnEnter(fn func(...interface{})) *FSMState {
+func (ft *FSMState) SetOnEnter(fn OnEnterFunc) *FSMState {
 	ft.onEnter = fn
 	return ft
 }
 
-func (ft *FSMState) SetOnExit(fn func(...interface{})) *FSMState {
+func (ft *FSMState) SetOnExit(fn OnExitFunc) *FSMState {
 	ft.onExit = fn
 	return ft
 }
 
-type HandleFunc func(State, State, ...interface{}) error
+type HandleFunc func(IMachine, context.Context, State, State, ...interface{}) error
 
 type FSM struct {
 	// State State
@@ -91,10 +105,12 @@ func NewFSM() *FSM {
 	return f
 }
 
-func (fsm *FSM) Machine(s State) *Machine {
+func (fsm *FSM) Machine(object IMachine) *Machine {
+	object.OnInitWithMachine(fsm)
 	return &Machine{
-		State: s,
-		fsm:   fsm,
+		state:  object.GetState,
+		fsm:    fsm,
+		object: object,
 	}
 }
 
@@ -104,7 +120,7 @@ func (fsm *FSM) GetStateOnFuncs(s State) (*FSMState, bool) {
 	// return nil, nil
 }
 
-func (fsm *FSM) SetStateFuncs(s State, onExit func(...interface{}), onEnter func(...interface{})) {
+func (fsm *FSM) SetStateFuncs(s State, onExit OnExitFunc, onEnter OnEnterFunc) {
 	_s, ok := fsm.states[s]
 	if !ok {
 		_s = &FSMState{}
