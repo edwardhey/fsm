@@ -16,13 +16,14 @@ type Machine struct {
 
 type IMachine interface {
 	GetState() State
-	SetState(State)
+	SetState(context.Context, State)
 	OnInitWithMachine(*FSM)
 }
 
 func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error {
 	fn, ok := m.fsm.GetHandleFunc(m.state, s)
 	isSpecial := m.fsm.IsSpecial(s)
+	// fmt.Println(m.state, s, fn, ok, isSpecial)
 	if !ok && !isSpecial { //如果没有，并且不是特殊的函数
 		return fmt.Errorf("Transition %v to %v not permitted", m.state, s)
 	}
@@ -47,7 +48,7 @@ func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error 
 		}
 	}
 	m.state = s
-	m.object.SetState(s)
+	m.object.SetState(ctx, s)
 	return nil
 }
 
@@ -108,7 +109,7 @@ func NewFSM() *FSM {
 func (fsm *FSM) Machine(object IMachine) *Machine {
 	object.OnInitWithMachine(fsm)
 	return &Machine{
-		state:  object.GetState,
+		state:  object.GetState(),
 		fsm:    fsm,
 		object: object,
 	}
