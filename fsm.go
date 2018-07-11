@@ -16,21 +16,33 @@ type Machine struct {
 
 type IMachine interface {
 	GetState() State
-	SetState(context.Context, State)
+	SetState(context.Context, State) error
+	// BeforeSetState(context.Context) error
 	OnInitWithMachine(*FSM)
 }
 
 func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error {
+	if s == m.state {
+		return nil
+	}
 	fn, ok := m.fsm.GetHandleFunc(m.state, s)
 	isSpecial := m.fsm.IsSpecial(s)
 	// fmt.Println(m.state, s, fn, ok, isSpecial)
 	if !ok && !isSpecial { //如果没有，并且不是特殊的函数
 		return fmt.Errorf("Transition %v to %v not permitted", m.state, s)
 	}
+
+	// err := m.object.BeforeSetState(ctx)
+	// if err != nil {
+	// 	return err
+	// }
 	{
 		stateFuncs, ok := m.fsm.GetStateOnFuncs(m.state)
 		if ok && stateFuncs.onExit != nil {
-			stateFuncs.onExit(m.object, ctx, args...)
+			err := stateFuncs.onExit(m.object, ctx, args...)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	{
@@ -44,16 +56,22 @@ func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error 
 	{
 		stateFuncs, ok := m.fsm.GetStateOnFuncs(s)
 		if ok && stateFuncs.onEnter != nil {
-			stateFuncs.onEnter(m.object, ctx, args...)
+			err := stateFuncs.onEnter(m.object, ctx, args...)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	err := m.object.SetState(ctx, s)
+	if err != nil {
+		return err
+	}
 	m.state = s
-	m.object.SetState(ctx, s)
 	return nil
 }
 
-type OnEnterFunc func(IMachine, context.Context, ...interface{})
-type OnExitFunc func(IMachine, context.Context, ...interface{})
+type OnEnterFunc func(IMachine, context.Context, ...interface{}) error
+type OnExitFunc func(IMachine, context.Context, ...interface{}) error
 
 type FSMState struct {
 	onEnter OnEnterFunc
