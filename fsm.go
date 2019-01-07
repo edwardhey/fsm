@@ -22,6 +22,7 @@ type IMachine interface {
 }
 
 func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error {
+	fmt.Println("\n\n状态机Goto", s, m.state, "\n\n")
 	if s == m.state {
 		return nil
 	}
