@@ -26,10 +26,8 @@ func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error 
 		return nil
 	}
 	fn, ok := m.fsm.GetHandleFunc(m.state, s)
-	fmt.Println("state goto", m.state, "->", s)
 	isSpecial := m.fsm.IsSpecial(s)
 	// fmt.Println(m.state, s, fn, ok, isSpecial)
-	fmt.Println(ok, isSpecial)
 	if !ok && !isSpecial { //如果没有，并且不是特殊的函数
 		return fmt.Errorf("Transition %v to %v not permitted", m.state, s)
 	}
@@ -57,7 +55,6 @@ func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error 
 	}
 	{
 		stateFuncs, ok := m.fsm.GetStateOnFuncs(s)
-		fmt.Println("onEntry", fmt.Sprintf("%+v", stateFuncs), ok)
 		if ok && stateFuncs.onEnter != nil {
 			err := stateFuncs.onEnter(m.object, ctx, args...)
 			if err != nil {
