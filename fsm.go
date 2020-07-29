@@ -64,12 +64,19 @@ func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error 
 		}
 	}
 
-	err := m.object.SetState(ctx, m.object.GetState())
-	if err != nil {
-		return err
+	if m.object.GetState() != s {
+		err := m.object.SetState(ctx, m.object.GetState())
+		if err != nil {
+			return err
+		}
+		m.state = m.object.GetState()
+	}else{
+		err := m.object.SetState(ctx, s)
+		if err != nil {
+			return err
+		}
+		m.state = s
 	}
-	
-	m.state = m.object.GetState()
 	return nil
 }
 
