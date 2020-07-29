@@ -47,13 +47,15 @@ func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error 
 		}
 	}
 	{
+		if err := m.object.SetState(ctx, s);err!= nil {
+			return err
+		}
+
 		if fn != nil {
 			err := fn(m.object, ctx, m.state, s, args...)
 			if err != nil {
 				return err
 			}
-		}else{
-			m.object.SetState(ctx, s)
 		}
 	}
 	{
@@ -65,7 +67,7 @@ func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error 
 			}
 		}
 	}
-
+	//fmt.Println("vvvvvvvvvv", m.object.GetState(), s)
 	if m.object.GetState() != s {
 		err := m.object.SetState(ctx, m.object.GetState())
 		if err != nil {
