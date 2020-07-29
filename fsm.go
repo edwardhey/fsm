@@ -26,11 +26,6 @@ func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error 
 		return nil
 	}
 
-	err := m.object.SetState(ctx, s)
-	if err != nil {
-		return err
-	}
-
 	fn, ok := m.fsm.GetHandleFunc(m.state, s)
 	isSpecial := m.fsm.IsSpecial(s)
 	// fmt.Println(m.state, s, fn, ok, isSpecial)
@@ -69,6 +64,11 @@ func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error 
 		}
 	}
 
+	err := m.object.SetState(ctx, s)
+	if err != nil {
+		return err
+	}
+	
 	m.state = s
 	return nil
 }
@@ -217,5 +217,6 @@ func (fsm *FSM) Then(fn HandleFunc) {
 // 	err := m.Goto(s3)
 // 	fmt.Println(err)
 // }
+
 
 
