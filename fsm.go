@@ -64,12 +64,12 @@ func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error 
 		}
 	}
 
-	err := m.object.SetState(ctx, s)
+	err := m.object.SetState(ctx, m.object.GetState())
 	if err != nil {
 		return err
 	}
 	
-	m.state = s
+	m.state = m.object.GetState()
 	return nil
 }
 
@@ -217,6 +217,7 @@ func (fsm *FSM) Then(fn HandleFunc) {
 // 	err := m.Goto(s3)
 // 	fmt.Println(err)
 // }
+
 
 
 
