@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"context"
 	"testing"
 )
 
@@ -13,9 +14,10 @@ const (
 
 type Mission struct {
 	Status Status
+	MachineAbs
 }
 
-func ChangeStatus(from State, to State, args ...interface{}) error {
+func ChangeStatus(IMachine, context.Context, State, State, ...interface{}) error {
 	return nil
 }
 
@@ -33,11 +35,13 @@ func TestFSM(t *testing.T) {
 	_fsm = NewFSM()
 	exitCall := false
 	enterCall := false
-	_fsm.SetStateFuncs(StatusOnline, func(args ...interface{}) {
+	_fsm.SetStateFuncs(StatusOnline, func(IMachine, context.Context, ...interface{}) error {
 		exitCall = true
+		return nil
 	}, nil)
-	_fsm.SetStateFuncs(StatusOffline, nil, func(args ...interface{}) {
+	_fsm.SetStateFuncs(StatusOffline, nil, func(IMachine, context.Context, ...interface{}) error {
 		enterCall = true
+		return nil
 	})
 	// _fsm.Special(StatusOnline)
 	_fsm.From(StatusOnline).To(StatusOffline).Then(ChangeStatus)
@@ -46,7 +50,7 @@ func TestFSM(t *testing.T) {
 	mission.Status = StatusOnline
 
 	m := _fsm.Machine(mission.Status)
-	m.Goto(StatusOffline)
+	m.Goto(StatusOffline, context.TODO())
 	if m.State != StatusOffline {
 		t.Error("状态设置成为 offline 失败")
 	}

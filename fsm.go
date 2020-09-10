@@ -8,6 +8,25 @@ import (
 // type Event uint64
 type State interface{}
 
+// MachineAbs 状态机基类
+type MachineAbs struct {
+	ignore bool //忽略就不进行更新
+	skip   bool //跳过中间其他更新处理，直接变更
+}
+func (ma *MachineAbs) GetIgnore() bool {
+	return ma.ignore
+}
+func (ma *MachineAbs) SetIgnore(b bool) {
+	ma.ignore = b
+}
+
+func (ma *MachineAbs) GetSkip() bool {
+	return ma.skip
+}
+func (ma *MachineAbs) SetSkip(b bool) {
+	ma.skip = b
+}
+
 type Machine struct {
 	state  State
 	fsm    *FSM
@@ -19,16 +38,19 @@ type IMachine interface {
 	SetState(context.Context, State) error
 	// BeforeSetState(context.Context) error
 	OnInitWithMachine(*FSM)
+	GetIgnore() bool
+	SetIgnore(b bool)
+	GetSkip() bool
+	SetSkip(b bool)
 }
 
-func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error {
+func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) (err error) {
 	if s == m.state {
 		return nil
 	}
 
 	fn, ok := m.fsm.GetHandleFunc(m.state, s)
 	isSpecial := m.fsm.IsSpecial(s)
-	//fmt.Println(m.state, s, fn, ok, isSpecial)
 	if !ok && !isSpecial { //如果没有，并且不是特殊的函数
 		return fmt.Errorf("Transition %v to %v not permitted", m.state, s)
 	}
@@ -37,49 +59,71 @@ func (m *Machine) Goto(s State, ctx context.Context, args ...interface{}) error 
 	// if err != nil {
 	// 	return err
 	// }
-	{
+
+	defer func() {
+		if err != nil {
+			return
+		} else if m.object.GetIgnore() {
+			return
+		}
+
+		_s := m.object.GetState()
+		//fmt.Println(m.object.GetIgnore(), m.object.GetSkip(), "中:",_s, "标:", s, "原:", m.state)
+
+		//如果有skip的话，中间状态就是目标状态
+		if m.object.GetSkip() {
+			err = m.object.SetState(ctx, _s)
+			if err != nil {
+				return
+			}
+			m.state = _s
+		}else if _s != s { //如果中间状态和最终状态不一样，就使用最终状态
+			err = m.object.SetState(ctx, s)
+			if err != nil {
+				return
+			}
+			m.state = s
+		} else {
+			err = m.object.SetState(ctx, _s)
+			if err != nil {
+				return
+			}
+			m.state = _s
+		}
+
+	}()
+
+	{//退出状态
 		stateFuncs, ok := m.fsm.GetStateOnFuncs(m.state)
 		if ok && stateFuncs.onExit != nil {
 			err := stateFuncs.onExit(m.object, ctx, args...)
 			if err != nil {
 				return err
 			}
+		} else if m.object.GetIgnore() || m.object.GetSkip() {
+			return
 		}
 	}
-	{
-		if err := m.object.SetState(ctx, s);err!= nil {
-			return err
-		}
-
-		if fn != nil {
-			err := fn(m.object, ctx, m.state, s, args...)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	{
+	{//退出状态
 		stateFuncs, ok := m.fsm.GetStateOnFuncs(s)
 		if ok && stateFuncs.onEnter != nil {
-			err := stateFuncs.onEnter(m.object, ctx, args...)
+			err = stateFuncs.onEnter(m.object, ctx, args...)
 			if err != nil {
-				return err
+				return
 			}
+		} else if m.object.GetIgnore() || m.object.GetSkip() {
+			return
 		}
 	}
-	//fmt.Println("vvvvvvvvvv", m.object.GetState(), s)
-	if m.object.GetState() != s {
-		err := m.object.SetState(ctx, m.object.GetState())
+
+	//变更状态
+	if fn != nil {
+		err = fn(m.object, ctx, m.state, s, args...)
 		if err != nil {
-			return err
+			return
+		} else if m.object.GetIgnore() || m.object.GetSkip() {
+			return
 		}
-		m.state = m.object.GetState()
-	}else{
-		err := m.object.SetState(ctx, s)
-		if err != nil {
-			return err
-		}
-		m.state = s
 	}
 	return nil
 }
@@ -228,6 +272,7 @@ func (fsm *FSM) Then(fn HandleFunc) {
 // 	err := m.Goto(s3)
 // 	fmt.Println(err)
 // }
+
 
 
 
